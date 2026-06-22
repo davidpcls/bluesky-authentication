@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bluesky-authentication"
+version = "0.1.0"
+description = "Shared authentication protocols and authenticators for Bluesky services"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "cachetools",
+    "fastapi",
+    "httpx",
+    "pydantic>=2,<3",
+    "python-jose[cryptography]",
+    "starlette",
+]
+
+[project.optional-dependencies]
+ldap = ["ldap3"]
+pam = ["pamela"]
+saml = ["python3-saml"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bluesky_authentication"]
