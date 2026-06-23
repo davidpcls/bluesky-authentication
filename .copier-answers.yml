@@ -1,0 +1,14 @@
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+_commit: 2026.06.18-5-g308c442
+_src_path: gh:scientific-python/cookie
+backend: hatch
+docs: sphinx
+email: david.pastl@lightsource.ca
+full_name: David Pastl
+license: BSD
+org: davidpcls
+project_name: bluesky-authentication
+project_short_description: A common authentication package for use in web serving
+    applications
+url: https://github.com/davidpcls/bluesky-authentication
+vcs: true
