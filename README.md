@@ -71,7 +71,8 @@ if state is None:
     ...
 ```
 
-`ExternalAuthenticator` implementations authenticate from a web callback request:
+`ExternalAuthenticator` implementations authenticate from a web callback
+request:
 
 ```python
 state = await external_authenticator.authenticate(request)
