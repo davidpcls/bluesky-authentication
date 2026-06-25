@@ -12,5 +12,5 @@ class DummyAuthenticator(InternalAuthenticator):
     def __init__(self, confirmation_message: str = ""):
         self.confirmation_message = confirmation_message
 
-    async def authenticate(self, username: str, password: str) -> UserSessionState:
+    async def authenticate(self, username: str, _password: str) -> UserSessionState:
         return UserSessionState(username, {})

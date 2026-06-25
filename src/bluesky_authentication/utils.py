@@ -1,4 +1,4 @@
-import importlib
+import importlib.util
 from collections.abc import Mapping
 
 from fastapi import Request
@@ -22,6 +22,5 @@ def get_root_url_low_level(request_headers: Mapping[str, str], scope: Scope) -> 
     host = request_headers.get("x-forwarded-host", request_headers["host"])
     scheme = request_headers.get("x-forwarded-proto", scope["scheme"])
     root_path = scope.get("root_path", "")
-    if root_path.endswith("/"):
-        root_path = root_path[:-1]
+    root_path = root_path.removesuffix("/")
     return f"{scheme}://{host}{root_path}"

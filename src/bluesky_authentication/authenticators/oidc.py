@@ -1,11 +1,11 @@
 import base64
 import functools
 import logging
+import time
 from datetime import timedelta
-from typing import Any, List, Optional, cast
+from typing import Any, cast
 
 import httpx
-from cachetools import TTLCache, cached
 from fastapi import Request
 from fastapi.security import OAuth2, OAuth2AuthorizationCodeBearer
 from jose import JWTError, jwt
@@ -46,8 +46,8 @@ properties:
         client_secret: str,
         well_known_uri: str,
         confirmation_message: str = "",
-        redirect_on_success: Optional[str] = None,
-        redirect_on_failure: Optional[str] = None,
+        redirect_on_success: str | None = None,
+        redirect_on_failure: str | None = None,
     ):
         self._audience = audience
         self._client_id = client_id
@@ -56,12 +56,14 @@ properties:
         self.confirmation_message = confirmation_message
         self.redirect_on_success = redirect_on_success
         self.redirect_on_failure = redirect_on_failure
+        self._keys_cache: list[dict[str, Any]] | None = None
+        self._keys_cache_expires_at = 0.0
 
     @functools.cached_property
     def _config_from_oidc_url(self) -> dict[str, Any]:
         response: httpx.Response = httpx.get(self._well_known_url)
         response.raise_for_status()
-        return response.json()
+        return cast("dict[str, Any]", response.json())
 
     @functools.cached_property
     def client_id(self) -> str:
@@ -70,55 +72,70 @@ properties:
     @functools.cached_property
     def id_token_signing_alg_values_supported(self) -> list[str]:
         return cast(
-            list[str],
+            "list[str]",
             self._config_from_oidc_url.get("id_token_signing_alg_values_supported"),
         )
 
     @functools.cached_property
     def issuer(self) -> str:
-        return cast(str, self._config_from_oidc_url.get("issuer"))
+        return cast("str", self._config_from_oidc_url.get("issuer"))
 
     @functools.cached_property
     def jwks_uri(self) -> str:
-        return cast(str, self._config_from_oidc_url.get("jwks_uri"))
+        return cast("str", self._config_from_oidc_url.get("jwks_uri"))
 
     @functools.cached_property
     def token_endpoint(self) -> str:
-        return cast(str, self._config_from_oidc_url.get("token_endpoint"))
+        return cast("str", self._config_from_oidc_url.get("token_endpoint"))
 
     @functools.cached_property
     def authorization_endpoint(self) -> httpx.URL:
         return httpx.URL(
-            cast(str, self._config_from_oidc_url.get("authorization_endpoint"))
+            cast("str", self._config_from_oidc_url.get("authorization_endpoint"))
         )
 
     @functools.cached_property
     def device_authorization_endpoint(self) -> str:
         return cast(
-            str, self._config_from_oidc_url.get("device_authorization_endpoint")
+            "str", self._config_from_oidc_url.get("device_authorization_endpoint")
         )
 
     @functools.cached_property
     def end_session_endpoint(self) -> str:
-        return cast(str, self._config_from_oidc_url.get("end_session_endpoint"))
+        return cast("str", self._config_from_oidc_url.get("end_session_endpoint"))
 
-    @cached(TTLCache(maxsize=1, ttl=timedelta(hours=1).total_seconds()))
-    def keys(self) -> List[str]:
-        return httpx.get(self.jwks_uri).raise_for_status().json().get("keys", [])
+    def keys(self) -> list[dict[str, Any]]:
+        if (
+            self._keys_cache is not None
+            and time.monotonic() < self._keys_cache_expires_at
+        ):
+            return self._keys_cache
+
+        response = httpx.get(self.jwks_uri)
+        response.raise_for_status()
+        keys = cast("list[dict[str, Any]]", response.json().get("keys", []))
+        self._keys_cache = keys
+        self._keys_cache_expires_at = (
+            time.monotonic() + timedelta(hours=1).total_seconds()
+        )
+        return keys
 
     def decode_token(
-        self, id_token: str, access_token: Optional[str] = None
+        self, id_token: str, access_token: str | None = None
     ) -> dict[str, Any]:
-        return jwt.decode(
-            id_token,
-            key=self.keys(),
-            algorithms=self.id_token_signing_alg_values_supported,
-            audience=self._audience,
-            issuer=self.issuer,
-            access_token=access_token,
+        return cast(
+            "dict[str, Any]",
+            jwt.decode(
+                id_token,
+                key=self.keys(),
+                algorithms=self.id_token_signing_alg_values_supported,
+                audience=self._audience,
+                issuer=self.issuer,
+                access_token=access_token,
+            ),
         )
 
-    async def authenticate(self, request: Request) -> Optional[UserSessionState]:
+    async def authenticate(self, request: Request) -> UserSessionState | None:
         code = request.query_params.get("code")
         if not code:
             logger.warning(
@@ -197,7 +214,7 @@ properties:
         client_id: str,
         well_known_uri: str,
         device_flow_client_id: str,
-        scopes: Optional[List[str]] = None,
+        scopes: list[str] | None = None,
         confirmation_message: str = "",
     ):
         super().__init__(
@@ -225,13 +242,13 @@ async def exchange_code(
     client_id: str,
     client_secret: str,
     redirect_uri: str,
-    extra_scopes: Optional[List[str]] = None,
+    extra_scopes: list[str] | None = None,
 ) -> httpx.Response:
     scopes = {"openid", "offline_access"}
     if extra_scopes:
         scopes.update(extra_scopes)
     auth_value = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
-    response = httpx.post(
+    return httpx.post(
         url=token_uri,
         data={
             "grant_type": "authorization_code",
@@ -243,4 +260,3 @@ async def exchange_code(
         },
         headers={"Authorization": f"Basic {auth_value}"},
     )
-    return response

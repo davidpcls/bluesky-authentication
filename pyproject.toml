@@ -117,6 +117,22 @@ module = "bluesky_authentication.*"
 disallow_untyped_defs = true
 disallow_incomplete_defs = true
 
+[[tool.mypy.overrides]]
+module = [
+  "cryptography",
+  "cryptography.*",
+  "fastapi",
+  "fastapi.*",
+  "httpx",
+  "jose",
+  "jose.*",
+  "pydantic",
+  "respx",
+  "starlette",
+  "starlette.*",
+]
+ignore_missing_imports = true
+
 
 [tool.ruff]
 show-fixes = true

@@ -9,21 +9,22 @@ from bluesky_authentication.authenticators import LDAPAuthenticator
 TEST_LDAP = os.getenv("TILED_TEST_LDAP")
 
 
-# fmt: off
 @pytest.mark.filterwarnings("ignore::DeprecationWarning")
-@pytest.mark.parametrize("ldap_server_address, ldap_server_port", [
-    ("localhost", 1389),
-    ("localhost:1389", 904),
-    ("localhost:1389", None),
-    ("127.0.0.1", 1389),
-    ("127.0.0.1:1389", 904),
-    (["localhost"], 1389),
-    (["localhost", "127.0.0.1"], 1389),
-    (["localhost", "127.0.0.1:1389"], 1389),
-    (["localhost:1389", "127.0.0.1:1389"], None),
-])
-# fmt: on
-@pytest.mark.parametrize("use_tls,use_ssl", [(False, False)])
+@pytest.mark.parametrize(
+    ("ldap_server_address", "ldap_server_port"),
+    [
+        ("localhost", 1389),
+        ("localhost:1389", 904),
+        ("localhost:1389", None),
+        ("127.0.0.1", 1389),
+        ("127.0.0.1:1389", 904),
+        (["localhost"], 1389),
+        (["localhost", "127.0.0.1"], 1389),
+        (["localhost", "127.0.0.1:1389"], 1389),
+        (["localhost:1389", "127.0.0.1:1389"], None),
+    ],
+)
+@pytest.mark.parametrize(("use_tls", "use_ssl"), [(False, False)])
 def test_ldap_authenticator_basic(
     use_tls: bool,
     use_ssl: bool,
@@ -42,8 +43,12 @@ def test_ldap_authenticator_basic(
     )
 
     async def testing() -> None:
-        assert (await authenticator.authenticate("user01", "password1")).user_name == "user01"  # type: ignore[union-attr]
-        assert (await authenticator.authenticate("user02", "password2")).user_name == "user02"  # type: ignore[union-attr]
+        assert (
+            await authenticator.authenticate("user01", "password1")
+        ).user_name == "user01"  # type: ignore[union-attr]
+        assert (
+            await authenticator.authenticate("user02", "password2")
+        ).user_name == "user02"  # type: ignore[union-attr]
         assert (await authenticator.authenticate("user02a", "password2")) is None
         assert (await authenticator.authenticate("user02", "password2a")) is None
 

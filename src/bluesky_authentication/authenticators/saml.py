@@ -1,4 +1,6 @@
-from typing import Mapping, Optional
+import importlib
+from collections.abc import Mapping
+from typing import Any
 
 from fastapi import APIRouter, Request
 from starlette.responses import RedirectResponse
@@ -7,10 +9,14 @@ from ..protocols import ExternalAuthenticator, UserSessionState
 from ..utils import modules_available
 
 
+class SAMLResponseError(RuntimeError):
+    """Raised when processing a SAML response fails."""
+
+
 class SAMLAuthenticator(ExternalAuthenticator):
     def __init__(
         self,
-        saml_settings,
+        saml_settings: Mapping[str, Any],
         attribute_name: str,
         confirmation_message: str = "",
     ):
@@ -22,49 +28,53 @@ class SAMLAuthenticator(ExternalAuthenticator):
         router = APIRouter()
 
         if not modules_available("onelogin"):
-            raise ModuleNotFoundError(
-                "This SAMLAuthenticator requires 'python3-saml' to be installed."
-            )
+            msg = "This SAMLAuthenticator requires 'python3-saml' to be installed."
+            raise ModuleNotFoundError(msg)
 
-        from onelogin.saml2.auth import OneLogin_Saml2_Auth
-
-        @router.get("/login")
         async def saml_login(request: Request) -> RedirectResponse:
             req = await prepare_saml_from_fastapi_request(request)
+            OneLogin_Saml2_Auth = self._load_onelogin_saml_auth()
             auth = OneLogin_Saml2_Auth(req, self.saml_settings)
             callback_url = auth.login()
             return RedirectResponse(url=callback_url)
 
+        router.add_api_route("/login", saml_login, methods=["GET"])
+
         self.include_routers = [router]
 
-    async def authenticate(self, request: Request) -> Optional[UserSessionState]:
+    @staticmethod
+    def _load_onelogin_saml_auth() -> Any:
+        module = importlib.import_module("onelogin.saml2.auth")
+        return module.OneLogin_Saml2_Auth
+
+    async def authenticate(self, request: Request) -> UserSessionState | None:
         if not modules_available("onelogin"):
-            raise ModuleNotFoundError(
-                "This SAMLAuthenticator requires the module 'oneline' to be installed."
+            msg = (
+                "This SAMLAuthenticator requires the module 'onelogin' to be installed."
             )
-        from onelogin.saml2.auth import OneLogin_Saml2_Auth
+            raise ModuleNotFoundError(msg)
+        OneLogin_Saml2_Auth = self._load_onelogin_saml_auth()
 
         req = await prepare_saml_from_fastapi_request(request)
         auth = OneLogin_Saml2_Auth(req, self.saml_settings)
         auth.process_response()
         errors = auth.get_errors()
         if errors:
-            raise Exception(
-                "Error when processing SAML Response: %s %s"
-                % (", ".join(errors), auth.get_last_error_reason())
-            )
+            reason = auth.get_last_error_reason()
+            msg = f"Error when processing SAML Response: {', '.join(errors)} {reason}"
+            raise SAMLResponseError(msg)
         if auth.is_authenticated():
             attribute_as_list = auth.get_attributes()[self.attribute_name]
             assert len(attribute_as_list) == 1
             return UserSessionState(attribute_as_list[0], {})
-        else:
-            return None
+        return None
 
 
-async def prepare_saml_from_fastapi_request(request: Request) -> Mapping[str, str]:
+async def prepare_saml_from_fastapi_request(request: Request) -> Mapping[str, Any]:
     form_data = await request.form()
-    rv = {
-        "http_host": request.client.host,
+    client_host = request.client.host if request.client is not None else ""
+    rv: dict[str, Any] = {
+        "http_host": client_host,
         "server_port": request.url.port,
         "script_name": request.url.path,
         "post_data": {},

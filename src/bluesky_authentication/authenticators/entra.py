@@ -1,6 +1,6 @@
 import logging
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import Request
 from jose import JWTError, jwt
@@ -20,11 +20,11 @@ class EntraAuthenticator(ProxiedOIDCAuthenticator):
         client_id: str,
         well_known_uri: str,
         device_flow_client_id: str,
-        extra_scopes: Optional[List[str]] = None,
+        extra_scopes: list[str] | None = None,
         confirmation_message: str = "",
-        scopes_map: Optional[Dict[str, list[str]]] = None,
+        scopes_map: dict[str, list[str]] | None = None,
         client_secret: str = "",
-        redirect_on_success: Optional[str] = None,
+        redirect_on_success: str | None = None,
     ):
         self.scopes_map = scopes_map if scopes_map is not None else {}
         self.extra_scopes = extra_scopes or []
@@ -40,19 +40,20 @@ class EntraAuthenticator(ProxiedOIDCAuthenticator):
             self._client_secret = Secret(client_secret)
         self.redirect_on_success = redirect_on_success
 
-        @property
-        def scopes(self):
-            mapped = set()
-            for tiled_scopes in self.scopes_map.values():
-                mapped.update(tiled_scopes)
-            return list(mapped)
+    @property
+    def scopes(self) -> list[str]:
+        mapped: set[str] = set()
+        for tiled_scopes in self.scopes_map.values():
+            mapped.update(tiled_scopes)
+        return list(mapped)
 
-        @scopes.setter
-        def scopes(self, value):
-            pass
+    @scopes.setter
+    def scopes(self, _value: list[str] | None) -> None:
+        # Scope mapping is configured through `scopes_map`.
+        return None
 
     def decode_token(
-        self, id_token: str, access_token: Optional[str] = None
+        self, id_token: str, access_token: str | None = None
     ) -> dict[str, Any]:
         claims = super().decode_token(id_token, access_token)
         original_sub = claims.get("sub")
@@ -99,7 +100,7 @@ class EntraAuthenticator(ProxiedOIDCAuthenticator):
 
         return claims
 
-    async def authenticate(self, request: Request) -> Optional[UserSessionState]:
+    async def authenticate(self, request: Request) -> UserSessionState | None:
         code = request.query_params.get("code")
         if not code:
             logger.warning(
@@ -131,7 +132,7 @@ class EntraAuthenticator(ProxiedOIDCAuthenticator):
             )
             return None
         username = verified_body.get("user") or verified_body["sub"]
-        state: dict = {}
+        state: dict[str, str] = {}
         if access_token:
             state["entra_access_token"] = access_token
         if refresh_token:

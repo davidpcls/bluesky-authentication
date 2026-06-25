@@ -1,9 +1,10 @@
 import asyncio
 import functools
+import importlib
 import logging
 import re
 from collections.abc import Iterable
-from typing import Optional
+from typing import Any
 
 from ..protocols import InternalAuthenticator, UserSessionState
 
@@ -13,29 +14,29 @@ logger = logging.getLogger(__name__)
 class LDAPAuthenticator(InternalAuthenticator):
     def __init__(
         self,
-        server_address,
-        server_port=None,
+        server_address: str | Iterable[str],
+        server_port: int | None = None,
         *,
-        use_ssl=False,
-        use_tls=True,
-        connect_timeout=5,
-        receive_timeout=60,
-        bind_dn_template=None,
-        allowed_groups=None,
-        valid_username_regex=r"^[a-z][.a-z0-9_-]*$",
-        lookup_dn=False,
-        user_search_base=None,
-        user_attribute=None,
-        lookup_dn_search_filter="({login_attr}={login})",
-        lookup_dn_search_user=None,
-        lookup_dn_search_password=None,
-        lookup_dn_user_dn_attribute=None,
-        escape_userdn=False,
-        search_filter="",
-        attributes=None,
-        auth_state_attributes=None,
-        use_lookup_dn_username=True,
-        confirmation_message="",
+        use_ssl: bool = False,
+        use_tls: bool = True,
+        connect_timeout: int = 5,
+        receive_timeout: int = 60,
+        bind_dn_template: str | list[str] | None = None,
+        allowed_groups: list[str] | None = None,
+        valid_username_regex: str = r"^[a-z][.a-z0-9_-]*$",
+        lookup_dn: bool = False,
+        user_search_base: str | None = None,
+        user_attribute: str | None = None,
+        lookup_dn_search_filter: str = "({login_attr}={login})",
+        lookup_dn_search_user: str | None = None,
+        lookup_dn_search_password: str | None = None,
+        lookup_dn_user_dn_attribute: str | None = None,
+        escape_userdn: bool = False,
+        search_filter: str = "",
+        attributes: list[str] | None = None,
+        auth_state_attributes: list[str] | None = None,
+        use_lookup_dn_username: bool = True,
+        confirmation_message: str = "",
     ):
         self.use_ssl = use_ssl
         self.use_tls = use_tls
@@ -53,21 +54,17 @@ class LDAPAuthenticator(InternalAuthenticator):
         self.lookup_dn_user_dn_attribute = lookup_dn_user_dn_attribute
         self.escape_userdn = escape_userdn
         self.search_filter = search_filter
-        self.attributes = attributes if attributes else []
-        self.auth_state_attributes = auth_state_attributes if auth_state_attributes else []
+        self.attributes = attributes or []
+        self.auth_state_attributes = auth_state_attributes or []
         self.use_lookup_dn_username = use_lookup_dn_username
 
         if isinstance(server_address, str):
             server_address_list = [server_address]
-        elif isinstance(server_address, Iterable):
-            server_address_list = list(server_address)
         else:
-            raise TypeError(
-                f"Unsupported type of `server_address` (list): server_address={server_address} "
-                f"type(server_address)={type(server_address)}"
-            )
+            server_address_list = list(server_address)
         if not server_address_list:
-            raise ValueError("No servers are specified: 'server_address' is an empty list")
+            msg = "No servers are specified: 'server_address' is an empty list"
+            raise ValueError(msg)
 
         self.server_address_list = server_address_list
         self.server_port = (
@@ -75,16 +72,21 @@ class LDAPAuthenticator(InternalAuthenticator):
         )
         self.confirmation_message = confirmation_message
 
-    def _server_port_default(self):
+    def _server_port_default(self) -> int:
         if self.use_ssl:
             return 636
-        else:
-            return 389
+        return 389
 
-    async def resolve_username(self, username_supplied_by_user):
-        import ldap3
+    @staticmethod
+    def _load_ldap3() -> Any:
+        return importlib.import_module("ldap3")
 
-        search_dn = self.lookup_dn_search_user
+    async def resolve_username(
+        self, username_supplied_by_user: str
+    ) -> tuple[str | None, str | None]:
+        ldap3 = self._load_ldap3()
+
+        search_dn = self.lookup_dn_search_user or ""
         if self.escape_userdn:
             search_dn = ldap3.utils.conv.escape_filter_chars(search_dn)
         conn = await asyncio.get_running_loop().run_in_executor(
@@ -110,7 +112,7 @@ class LDAPAuthenticator(InternalAuthenticator):
         await asyncio.get_running_loop().run_in_executor(None, search_func)
 
         response = conn.response
-        if len(response) == 0 or "attributes" not in response[0].keys():
+        if len(response) == 0 or "attributes" not in response[0]:
             msg = (
                 "No entry found for user '{username}' "
                 "when looking up attribute '{attribute}'"
@@ -126,15 +128,12 @@ class LDAPAuthenticator(InternalAuthenticator):
         if isinstance(user_dn, list):
             if len(user_dn) == 0:
                 return (None, None)
-            elif len(user_dn) == 1:
-                user_dn = user_dn[0]
-            else:
-                user_dn = user_dn[0]
+            user_dn = user_dn[0]
 
         return (user_dn, response[0]["dn"])
 
-    def get_connection(self, userdn, password):
-        import ldap3
+    def get_connection(self, userdn: str, password: str | None) -> Any:
+        ldap3 = self._load_ldap3()
 
         server_pool = ldap3.ServerPool(None, ldap3.RANDOM, active=False)
         for address in self.server_address_list:
@@ -158,17 +157,16 @@ class LDAPAuthenticator(InternalAuthenticator):
             ldap3.AUTO_BIND_TLS_BEFORE_BIND if self.use_tls else ldap3.AUTO_BIND_NO_TLS
         )
         auto_bind = ldap3.AUTO_BIND_NO_TLS if self.use_ssl else auto_bind_no_ssl
-        conn = ldap3.Connection(
+        return ldap3.Connection(
             server_pool,
             user=userdn,
             password=password,
             auto_bind=auto_bind,
             receive_timeout=self.receive_timeout,
         )
-        return conn
 
-    async def get_user_attributes(self, conn, userdn):
-        attrs = {}
+    async def get_user_attributes(self, conn: Any, userdn: str) -> dict[str, Any]:
+        attrs: dict[str, Any] = {}
         if self.auth_state_attributes:
             search_func = functools.partial(
                 conn.search,
@@ -182,9 +180,9 @@ class LDAPAuthenticator(InternalAuthenticator):
         return attrs
 
     async def authenticate(
-        self, username: str, password: str
-    ) -> Optional[UserSessionState]:
-        import ldap3
+        self, username: str, password: str | None
+    ) -> UserSessionState | None:
+        ldap3 = self._load_ldap3()
 
         username_saved = username
 
@@ -200,7 +198,7 @@ class LDAPAuthenticator(InternalAuthenticator):
             logger.warning("username:%s Login denied for blank password", username)
             return None
 
-        bind_dn_template = self.bind_dn_template
+        bind_dn_template: str | list[str] | None = self.bind_dn_template
         if isinstance(bind_dn_template, str):
             bind_dn_template = [bind_dn_template]
 
@@ -211,15 +209,22 @@ class LDAPAuthenticator(InternalAuthenticator):
             return None
 
         if self.lookup_dn:
-            username, resolved_dn = await self.resolve_username(username)
-            if not username:
+            resolved_username, resolved_dn = await self.resolve_username(username)
+            if not resolved_username:
                 return None
+            username = resolved_username
             if str(self.lookup_dn_user_dn_attribute).upper() == "CN":
                 username = re.subn(r"([^\\]),", r"\1\\,", username)[0]
             if not bind_dn_template:
+                if resolved_dn is None:
+                    return None
                 bind_dn_template = [resolved_dn]
 
+        if bind_dn_template is None:
+            return None
+
         is_bound = False
+        userdn = ""
         for dn in bind_dn_template:
             if not dn:
                 logger.warning("Ignoring blank 'bind_dn_template' entry!")
@@ -266,7 +271,9 @@ class LDAPAuthenticator(InternalAuthenticator):
             n_users = len(conn.response)
             if n_users == 0:
                 msg = "User with '{userattr}={username}' not found in directory"
-                logger.warning(msg.format(userattr=self.user_attribute, username=username))
+                logger.warning(
+                    msg.format(userattr=self.user_attribute, username=username)
+                )
                 return None
             if n_users > 1:
                 msg = (
@@ -284,11 +291,7 @@ class LDAPAuthenticator(InternalAuthenticator):
             found = False
             for group in self.allowed_groups:
                 group_filter = (
-                    "(|"
-                    "(member={userdn})"
-                    "(uniqueMember={userdn})"
-                    "(memberUid={uid})"
-                    ")"
+                    "(|(member={userdn})(uniqueMember={userdn})(memberUid={uid}))"
                 )
                 group_filter = group_filter.format(userdn=userdn, uid=username)
                 group_attributes = ["member", "uniqueMember", "memberUid"]

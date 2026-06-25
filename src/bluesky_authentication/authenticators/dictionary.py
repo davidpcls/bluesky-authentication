@@ -1,5 +1,5 @@
 import secrets
-from typing import Mapping, Optional
+from collections.abc import Mapping
 
 from ..protocols import InternalAuthenticator, UserSessionState
 
@@ -34,9 +34,10 @@ properties:
 
     async def authenticate(
         self, username: str, password: str
-    ) -> Optional[UserSessionState]:
+    ) -> UserSessionState | None:
         true_password = self._users_to_passwords.get(username)
         if not true_password:
-            return
+            return None
         if secrets.compare_digest(true_password, password):
             return UserSessionState(username, {})
+        return None

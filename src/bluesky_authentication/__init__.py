@@ -6,7 +6,6 @@ bluesky-authentication: A common authentication package for use in web serving a
 from __future__ import annotations
 
 from ._version import version as __version__
-
 from .authenticators import (
     DictionaryAuthenticator,
     DummyAuthenticator,
@@ -20,7 +19,6 @@ from .authenticators import (
 from .protocols import ExternalAuthenticator, InternalAuthenticator, UserSessionState
 
 __all__ = [
-    "__version__",
     "DictionaryAuthenticator",
     "DummyAuthenticator",
     "EntraAuthenticator",
@@ -32,4 +30,5 @@ __all__ = [
     "ProxiedOIDCAuthenticator",
     "SAMLAuthenticator",
     "UserSessionState",
+    "__version__",
 ]

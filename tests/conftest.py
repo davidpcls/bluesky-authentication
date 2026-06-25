@@ -38,7 +38,9 @@ def keys() -> tuple[rsa.RSAPrivateKey, rsa.RSAPublicKey]:
 
 
 @pytest.fixture
-def json_web_keyset(keys: tuple[rsa.RSAPrivateKey, rsa.RSAPublicKey]) -> list[dict[str, Any]]:
+def json_web_keyset(
+    keys: tuple[rsa.RSAPrivateKey, rsa.RSAPublicKey],
+) -> list[dict[str, Any]]:
     _, public_key = keys
     return [RSAKey(key=public_key, algorithm="RS256").to_dict()]
 

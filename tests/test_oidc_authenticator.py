@@ -1,5 +1,5 @@
 import time
-from typing import Any
+from typing import Any, cast
 
 import httpx
 import pytest
@@ -22,34 +22,49 @@ def token(issued: bool, expired: bool) -> dict[str, str | float]:
     }
 
 
-def encrypted_token(token_value: dict[str, str | float], private_key: rsa.RSAPrivateKey) -> str:
-    return jwt.encode(
-        token_value,
-        key=private_key,
-        algorithm="RS256",
-        headers={"kid": "secret"},
+def encrypted_token(
+    token_value: dict[str, str | float], private_key: rsa.RSAPrivateKey
+) -> str:
+    return cast(
+        "str",
+        jwt.encode(
+            token_value,
+            key=private_key,
+            algorithm="RS256",
+            headers={"kid": "secret"},
+        ),
     )
 
 
 def test_oidc_authenticator_caching(
-    mock_oidc_server: MockRouter,
+    mock_oidc_server: Any,
     well_known_url: str,
     well_known_response: dict[str, Any],
     json_web_keyset: list[dict[str, Any]],
 ) -> None:
-    authenticator = OIDCAuthenticator("tiled", "tiled", "secret", well_known_uri=well_known_url)
+    authenticator = OIDCAuthenticator(
+        "tiled", "tiled", "secret", well_known_uri=well_known_url
+    )
     assert authenticator.client_id == "tiled"
-    assert authenticator.authorization_endpoint == well_known_response["authorization_endpoint"]
-    assert authenticator.id_token_signing_alg_values_supported == well_known_response[
-        "id_token_signing_alg_values_supported"
-    ]
+    assert (
+        authenticator.authorization_endpoint
+        == well_known_response["authorization_endpoint"]
+    )
+    assert (
+        authenticator.id_token_signing_alg_values_supported
+        == well_known_response["id_token_signing_alg_values_supported"]
+    )
     assert authenticator.issuer == well_known_response["issuer"]
     assert authenticator.jwks_uri == well_known_response["jwks_uri"]
     assert authenticator.token_endpoint == well_known_response["token_endpoint"]
-    assert authenticator.device_authorization_endpoint == well_known_response[
-        "device_authorization_endpoint"
-    ]
-    assert authenticator.end_session_endpoint == well_known_response["end_session_endpoint"]
+    assert (
+        authenticator.device_authorization_endpoint
+        == well_known_response["device_authorization_endpoint"]
+    )
+    assert (
+        authenticator.end_session_endpoint
+        == well_known_response["end_session_endpoint"]
+    )
 
     assert len(mock_oidc_server.calls) == 1
     call_request = mock_oidc_server.calls[0].request
@@ -70,15 +85,17 @@ def test_oidc_authenticator_caching(
 
 @pytest.mark.parametrize("issued", [True, False])
 @pytest.mark.parametrize("expired", [True, False])
+@pytest.mark.usefixtures("mock_oidc_server")
 def test_oidc_decoding(
-    mock_oidc_server: MockRouter,
     well_known_url: str,
     issued: bool,
     expired: bool,
     keys: tuple[rsa.RSAPrivateKey, rsa.RSAPublicKey],
 ) -> None:
     private_key, _ = keys
-    authenticator = OIDCAuthenticator("tiled", "tiled", "secret", well_known_uri=well_known_url)
+    authenticator = OIDCAuthenticator(
+        "tiled", "tiled", "secret", well_known_uri=well_known_url
+    )
     access_token = token(issued, expired)
     encrypted_access_token = encrypted_token(access_token, private_key)
 
@@ -145,10 +162,10 @@ async def test_oidc_authenticator_mock(
 
     mock_request = create_mock_oidc_request({"code": "test-auth-code"})
 
-    def mock_jwt_decode(*args, **kwargs):
+    def mock_jwt_decode(*_args, **_kwargs):
         return mock_jwt_payload
 
-    def mock_jwk_construct(*args, **kwargs):
+    def mock_jwk_construct(*_args, **_kwargs):
         class MockJWK:
             pass
 

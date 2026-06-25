@@ -1,4 +1,5 @@
-from typing import Optional
+import importlib
+from typing import Any
 
 from ..protocols import InternalAuthenticator, UserSessionState
 from ..utils import modules_available
@@ -20,19 +21,22 @@ properties:
 
     def __init__(self, service: str = "login", confirmation_message: str = ""):
         if not modules_available("pamela"):
-            raise ModuleNotFoundError(
-                "This PAMAuthenticator requires the module 'pamela' to be installed."
-            )
+            msg = "This PAMAuthenticator requires the module 'pamela' to be installed."
+            raise ModuleNotFoundError(msg)
         self.service = service
         self.confirmation_message = confirmation_message
 
+    @staticmethod
+    def _load_pamela() -> Any:
+        return importlib.import_module("pamela")
+
     async def authenticate(
         self, username: str, password: str
-    ) -> Optional[UserSessionState]:
-        import pamela
+    ) -> UserSessionState | None:
+        pamela = self._load_pamela()
 
         try:
             pamela.authenticate(username, password, service=self.service)
             return UserSessionState(username, {})
         except pamela.PAMError:
-            return
+            return None
