@@ -195,6 +195,7 @@ reports.output-format = "colorized"
 similarities.ignore-imports = "yes"
 messages_control.disable = [
   "design",
+  "duplicate-code",
   "fixme",
   "line-too-long",
   "missing-module-docstring",

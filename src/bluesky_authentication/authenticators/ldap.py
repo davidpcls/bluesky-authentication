@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 
 
 class LDAPAuthenticator(InternalAuthenticator):
+    """Authenticate users against one or more LDAP servers."""
+
     def __init__(
         self,
         server_address: str | Iterable[str],
@@ -94,8 +96,9 @@ class LDAPAuthenticator(InternalAuthenticator):
         )
         is_bound = await asyncio.get_running_loop().run_in_executor(None, conn.bind)
         if not is_bound:
-            msg = "Failed to connect to LDAP server with search user '{search_dn}'"
-            logger.warning(msg.format(search_dn=search_dn))
+            logger.warning(
+                "Failed to connect to LDAP server with search user '%s'", search_dn
+            )
             return (None, None)
 
         search_filter = self.lookup_dn_search_filter.format(
@@ -113,14 +116,10 @@ class LDAPAuthenticator(InternalAuthenticator):
 
         response = conn.response
         if len(response) == 0 or "attributes" not in response[0]:
-            msg = (
-                "No entry found for user '{username}' "
-                "when looking up attribute '{attribute}'"
-            )
             logger.warning(
-                msg.format(
-                    username=username_supplied_by_user, attribute=self.user_attribute
-                )
+                "No entry found for user '%s' when looking up attribute '%s'",
+                username_supplied_by_user,
+                self.user_attribute,
             )
             return (None, None)
 
@@ -250,8 +249,7 @@ class LDAPAuthenticator(InternalAuthenticator):
                 break
 
         if not is_bound:
-            msg = "Invalid password for user '{username}'"
-            logger.warning(msg.format(username=username))
+            logger.warning("Invalid password for user '%s'", username)
             return None
 
         if self.search_filter:
@@ -270,20 +268,18 @@ class LDAPAuthenticator(InternalAuthenticator):
 
             n_users = len(conn.response)
             if n_users == 0:
-                msg = "User with '{userattr}={username}' not found in directory"
                 logger.warning(
-                    msg.format(userattr=self.user_attribute, username=username)
+                    "User with '%s=%s' not found in directory",
+                    self.user_attribute,
+                    username,
                 )
                 return None
             if n_users > 1:
-                msg = (
-                    "Duplicate users found! "
-                    "{n_users} users found with '{userattr}={username}'"
-                )
                 logger.warning(
-                    msg.format(
-                        userattr=self.user_attribute, username=username, n_users=n_users
-                    )
+                    "Duplicate users found! %s users found with '%s=%s'",
+                    n_users,
+                    self.user_attribute,
+                    username,
                 )
                 return None
 
@@ -310,8 +306,9 @@ class LDAPAuthenticator(InternalAuthenticator):
                     break
 
             if not found:
-                msg = "username:{username} User not in any of the allowed groups"
-                logger.warning(msg.format(username=username))
+                logger.warning(
+                    "username:%s User not in any of the allowed groups", username
+                )
                 return None
 
         if not self.use_lookup_dn_username:

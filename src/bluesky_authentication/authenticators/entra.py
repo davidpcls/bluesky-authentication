@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 
 
 class EntraAuthenticator(ProxiedOIDCAuthenticator):
+    """OIDC authenticator tailored for Microsoft Entra claims and scopes."""
+
     def __init__(
         self,
         audience: str,

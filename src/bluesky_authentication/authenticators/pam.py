@@ -6,6 +6,8 @@ from ..utils import modules_available
 
 
 class PAMAuthenticator(InternalAuthenticator):
+    """Authenticate users against the host's PAM service."""
+
     configuration_schema = """
 $schema": http://json-schema.org/draft-07/schema#
 type: object

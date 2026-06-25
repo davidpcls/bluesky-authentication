@@ -14,6 +14,8 @@ class SAMLResponseError(RuntimeError):
 
 
 class SAMLAuthenticator(ExternalAuthenticator):
+    """Authenticate users using a SAML identity provider callback flow."""
+
     def __init__(
         self,
         saml_settings: Mapping[str, Any],
@@ -33,8 +35,8 @@ class SAMLAuthenticator(ExternalAuthenticator):
 
         async def saml_login(request: Request) -> RedirectResponse:
             req = await prepare_saml_from_fastapi_request(request)
-            OneLogin_Saml2_Auth = self._load_onelogin_saml_auth()
-            auth = OneLogin_Saml2_Auth(req, self.saml_settings)
+            onelogin_saml2_auth = self._load_onelogin_saml_auth()
+            auth = onelogin_saml2_auth(req, self.saml_settings)
             callback_url = auth.login()
             return RedirectResponse(url=callback_url)
 
@@ -53,10 +55,10 @@ class SAMLAuthenticator(ExternalAuthenticator):
                 "This SAMLAuthenticator requires the module 'onelogin' to be installed."
             )
             raise ModuleNotFoundError(msg)
-        OneLogin_Saml2_Auth = self._load_onelogin_saml_auth()
+        onelogin_saml2_auth = self._load_onelogin_saml_auth()
 
         req = await prepare_saml_from_fastapi_request(request)
-        auth = OneLogin_Saml2_Auth(req, self.saml_settings)
+        auth = onelogin_saml2_auth(req, self.saml_settings)
         auth.process_response()
         errors = auth.get_errors()
         if errors:

@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 
 
 class OIDCAuthenticator(ExternalAuthenticator):
+    """Authenticate users using an OpenID Connect authorization code flow."""
+
     configuration_schema = """
 $schema": http://json-schema.org/draft-07/schema#
 type: object
@@ -184,6 +186,8 @@ properties:
 
 
 class ProxiedOIDCAuthenticator(OIDCAuthenticator):
+    """Expose OIDC bearer-token schema for authentication handled upstream."""
+
     configuration_schema = """
 $schema": http://json-schema.org/draft-07/schema#
 type: object
