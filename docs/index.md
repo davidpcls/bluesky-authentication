@@ -4,6 +4,8 @@
 :maxdepth: 2
 :hidden:
 
+usage
+authenticator-reference
 ```
 
 ```{include} ../README.md
