@@ -6,6 +6,7 @@
 
 usage
 authenticator-reference
+authentication-flows
 ```
 
 ```{include} ../README.md
