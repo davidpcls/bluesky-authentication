@@ -5,7 +5,7 @@ Bluesky applications that use `bluesky-authentication`.
 
 ## 1) High-Level Architecture
 
-```
+```mermaid
 flowchart LR
     U[User / Client] -->|HTTP / WebSocket| APP[Application<br/>(Tiled or HTTP Server)]
     APP --> AUTH[Auth Routes + Workflow Layer<br/>(bluesky-authentication)]
