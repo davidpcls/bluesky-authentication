@@ -7,32 +7,32 @@ Bluesky applications that use `bluesky-authentication`.
 
 ```mermaid
 flowchart LR
-    U[User / Client] -->|HTTP / WebSocket| APP[Application<br/>(Tiled or HTTP Server)]
-    APP --> AUTH[Auth Routes + Workflow Layer<br/>(bluesky-authentication)]
-    AUTH --> DB[(Auth DB<br/>principals, identities, sessions, api_keys, pending_sessions)]
-    AUTH --> IDP[External Identity Provider<br/>OIDC / Entra / LDAP / SAML]
-    AUTH --> POLICY[Application Policy / Authorization<br/>(kept app-specific)]
+    U["User / Client"] -->|HTTP / WebSocket| APP["Application<br/>Tiled or HTTP Server"]
+    APP --> AUTH["Auth Routes + Workflow Layer<br/>bluesky-authentication"]
+    AUTH --> DB[("Auth DB<br/>principals, identities, sessions, api_keys, pending_sessions")]
+    AUTH --> IDP["External Identity Provider<br/>OIDC / Entra / LDAP / SAML"]
+    AUTH --> POLICY["Application Policy / Authorization<br/>kept app-specific"]
     POLICY --> APP
-    APP --> RES[Protected Application Resources]
+    APP --> RES["Protected Application Resources"]
 ```
 
 ## 2) Request Authentication Decision
 
-```
+```mermaid
 flowchart TD
-    A[Incoming request] --> B{Has Authorization?}
-    B -->|Bearer access token| C[Validate JWT + scopes]
-    B -->|API key| D[Lookup API key in DB + check expiry/scopes]
-    B -->|No credentials| E[401 / redirect to auth]
-    C --> F{Valid + authorized?}
+    A["Incoming request"] --> B{"Has Authorization?"}
+    B -->|Bearer access token| C["Validate JWT + scopes"]
+    B -->|API key| D["Lookup API key in DB + check expiry/scopes"]
+    B -->|No credentials| E["401 / redirect to auth"]
+    C --> F{"Valid + authorized?"}
     D --> F
-    F -->|Yes| G[Allow request]
-    F -->|No| H[Reject (401/403)]
+    F -->|Yes| G["Allow request"]
+    F -->|No| H["Reject 401/403"]
 ```
 
 ## 3) Username/Password Flow
 
-```
+```mermaid
 sequenceDiagram
     participant User
     participant App
@@ -56,7 +56,7 @@ sequenceDiagram
 
 ## 4) Browser OIDC Authorization Code Flow
 
-```
+```mermaid
 sequenceDiagram
     participant Browser
     participant App
@@ -78,7 +78,7 @@ sequenceDiagram
 
 ## 5) Device Code Flow (CLI / Headless)
 
-```
+```mermaid
 sequenceDiagram
     participant CLI
     participant App
@@ -106,7 +106,7 @@ sequenceDiagram
 
 ## 6) Refresh Token Flow
 
-```
+```mermaid
 sequenceDiagram
     participant Client
     participant App
@@ -125,7 +125,7 @@ sequenceDiagram
 
 ## 7) API Key Flow
 
-```
+```mermaid
 sequenceDiagram
     participant Client
     participant App
@@ -143,12 +143,12 @@ sequenceDiagram
 
 ## 8) Application Integration Steps
 
-```
+```mermaid
 flowchart TD
-    A[Create app server] --> B[Configure authenticators]
-    B --> C[Register auth routes]
-    C --> D[Configure auth DB + migrations]
-    D --> E[Wire policy/authorization layer]
-    E --> F[Protect resource routes with scopes]
-    F --> G[Run background cleanup for expired sessions and API keys]
+    A["Create app server"] --> B["Configure authenticators"]
+    B --> C["Register auth routes"]
+    C --> D["Configure auth DB + migrations"]
+    D --> E["Wire policy/authorization layer"]
+    E --> F["Protect resource routes with scopes"]
+    F --> G["Run background cleanup for expired sessions and API keys"]
 ```
