@@ -21,7 +21,7 @@ class OIDCAuthenticator(ExternalAuthenticator):
     """Authenticate users using an OpenID Connect authorization code flow."""
 
     configuration_schema = """
-$schema": http://json-schema.org/draft-07/schema#
+"$schema": http://json-schema.org/draft-07/schema#
 type: object
 additionalProperties: false
 properties:
@@ -63,6 +63,15 @@ properties:
 
     @functools.cached_property
     def _config_from_oidc_url(self) -> dict[str, Any]:
+        """Fetch OIDC discovery document from the well-known URI.
+
+        .. note::
+            This makes a **blocking** HTTP request on first access.  Subsequent
+            accesses return the cached result without any network I/O.
+
+        # TODO: consider making this async
+        """
+        # TODO: consider making this async
         response: httpx.Response = httpx.get(self._well_known_url)
         response.raise_for_status()
         return cast("dict[str, Any]", response.json())
@@ -106,14 +115,15 @@ properties:
     def end_session_endpoint(self) -> str:
         return cast("str", self._config_from_oidc_url.get("end_session_endpoint"))
 
-    def keys(self) -> list[dict[str, Any]]:
+    async def keys(self) -> list[dict[str, Any]]:
         if (
             self._keys_cache is not None
             and time.monotonic() < self._keys_cache_expires_at
         ):
             return self._keys_cache
 
-        response = httpx.get(self.jwks_uri)
+        async with httpx.AsyncClient() as client:
+            response = await client.get(self.jwks_uri)
         response.raise_for_status()
         keys = cast("list[dict[str, Any]]", response.json().get("keys", []))
         self._keys_cache = keys
@@ -122,14 +132,14 @@ properties:
         )
         return keys
 
-    def decode_token(
+    async def decode_token(
         self, id_token: str, access_token: str | None = None
     ) -> dict[str, Any]:
         return cast(
             "dict[str, Any]",
             jwt.decode(
                 id_token,
-                key=self.keys(),
+                key=await self.keys(),
                 algorithms=self.id_token_signing_alg_values_supported,
                 audience=self._audience,
                 issuer=self.issuer,
@@ -160,7 +170,7 @@ properties:
         id_token = response_body["id_token"]
         access_token = response_body.get("access_token")
         try:
-            verified_body = self.decode_token(id_token, access_token)
+            verified_body = await self.decode_token(id_token, access_token)
         except JWTError:
             logger.exception(
                 "Authentication error. Unverified token: %r",
@@ -189,7 +199,7 @@ class ProxiedOIDCAuthenticator(OIDCAuthenticator):
     """Expose OIDC bearer-token schema for authentication handled upstream."""
 
     configuration_schema = """
-$schema": http://json-schema.org/draft-07/schema#
+"$schema": http://json-schema.org/draft-07/schema#
 type: object
 additionalProperties: false
 properties:
@@ -252,15 +262,16 @@ async def exchange_code(
     if extra_scopes:
         scopes.update(extra_scopes)
     auth_value = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
-    return httpx.post(
-        url=token_uri,
-        data={
-            "grant_type": "authorization_code",
-            "client_id": client_id,
-            "redirect_uri": redirect_uri,
-            "code": auth_code,
-            "client_secret": client_secret,
-            "scope": " ".join(sorted(scopes)),
-        },
-        headers={"Authorization": f"Basic {auth_value}"},
-    )
+    async with httpx.AsyncClient() as client:
+        return await client.post(
+            url=token_uri,
+            data={
+                "grant_type": "authorization_code",
+                "client_id": client_id,
+                "redirect_uri": redirect_uri,
+                "code": auth_code,
+                "client_secret": client_secret,
+                "scope": " ".join(sorted(scopes)),
+            },
+            headers={"Authorization": f"Basic {auth_value}"},
+        )

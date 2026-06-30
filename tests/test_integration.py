@@ -46,7 +46,9 @@ class _RecordingAdapter(AuthRouteAdapter):
         return endpoint
 
     def include_base_routes(self, router: APIRouter) -> None:
-        router.add_api_route("/session/refresh", self._route("refresh"), methods=["POST"])
+        router.add_api_route(
+            "/session/refresh", self._route("refresh"), methods=["POST"]
+        )
 
     def build_internal_token_route(
         self, authenticator: InternalAuthenticator, provider: str
@@ -137,5 +139,9 @@ def test_build_authentication_router_allows_external_code_methods_override() -> 
         external_code_methods=("GET", "POST"),
     )
 
-    code_route = next(route for route in router.routes if getattr(route, "path", "") == "/provider/oidc/code")
+    code_route = next(
+        route
+        for route in router.routes
+        if getattr(route, "path", "") == "/provider/oidc/code"
+    )
     assert code_route.methods == {"GET", "POST"}

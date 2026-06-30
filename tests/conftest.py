@@ -7,17 +7,17 @@ from jose.backends import RSAKey
 from respx import MockRouter
 
 
-@pytest.fixture
+@pytest.fixture  # type: ignore[untyped-decorator]
 def base_url() -> str:
     return "https://example.com/realms/example"
 
 
-@pytest.fixture
+@pytest.fixture  # type: ignore[untyped-decorator]
 def well_known_url(base_url: str) -> str:
     return f"{base_url}.well-known/openid-configuration"
 
 
-@pytest.fixture
+@pytest.fixture  # type: ignore[untyped-decorator]
 def well_known_response(base_url: str) -> dict[str, Any]:
     return {
         "id_token_signing_alg_values_supported": ["RS256"],
@@ -30,14 +30,14 @@ def well_known_response(base_url: str) -> dict[str, Any]:
     }
 
 
-@pytest.fixture
+@pytest.fixture  # type: ignore[untyped-decorator]
 def keys() -> tuple[rsa.RSAPrivateKey, rsa.RSAPublicKey]:
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     public_key = private_key.public_key()
     return (private_key, public_key)
 
 
-@pytest.fixture
+@pytest.fixture  # type: ignore[untyped-decorator]
 def json_web_keyset(
     keys: tuple[rsa.RSAPrivateKey, rsa.RSAPublicKey],
 ) -> list[dict[str, Any]]:
@@ -45,7 +45,7 @@ def json_web_keyset(
     return [RSAKey(key=public_key, algorithm="RS256").to_dict()]
 
 
-@pytest.fixture
+@pytest.fixture  # type: ignore[untyped-decorator]
 def mock_oidc_server(
     respx_mock: MockRouter,
     well_known_url: str,

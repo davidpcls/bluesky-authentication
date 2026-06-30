@@ -12,7 +12,7 @@ class DictionaryAuthenticator(InternalAuthenticator):
     """
 
     configuration_schema = """
-$schema": http://json-schema.org/draft-07/schema#
+"$schema": http://json-schema.org/draft-07/schema#
 type: object
 additionalProperties: false
 properties:

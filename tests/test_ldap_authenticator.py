@@ -9,8 +9,8 @@ from bluesky_authentication.authenticators import LDAPAuthenticator
 TEST_LDAP = os.getenv("TILED_TEST_LDAP")
 
 
-@pytest.mark.filterwarnings("ignore::DeprecationWarning")
-@pytest.mark.parametrize(
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")  # type: ignore[untyped-decorator]
+@pytest.mark.parametrize(  # type: ignore[untyped-decorator]
     ("ldap_server_address", "ldap_server_port"),
     [
         ("localhost", 1389),
@@ -24,7 +24,7 @@ TEST_LDAP = os.getenv("TILED_TEST_LDAP")
         (["localhost:1389", "127.0.0.1:1389"], None),
     ],
 )
-@pytest.mark.parametrize(("use_tls", "use_ssl"), [(False, False)])
+@pytest.mark.parametrize(("use_tls", "use_ssl"), [(False, False)])  # type: ignore[untyped-decorator]
 def test_ldap_authenticator_basic(
     use_tls: bool,
     use_ssl: bool,

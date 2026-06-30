@@ -22,8 +22,16 @@ from .integration import (
     build_authentication_router,
 )
 from .protocols import ExternalAuthenticator, InternalAuthenticator, UserSessionState
+from .tokens import (
+    ALGORITHM,
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    decode_token_with_secret_keys,
+)
 
 __all__ = [
+    "ALGORITHM",
     "AuthProviderRegistration",
     "AuthRouteAdapter",
     "DictionaryAuthenticator",
@@ -39,4 +47,8 @@ __all__ = [
     "UserSessionState",
     "__version__",
     "build_authentication_router",
+    "create_access_token",
+    "create_refresh_token",
+    "decode_token",
+    "decode_token_with_secret_keys",
 ]

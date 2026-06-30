@@ -31,7 +31,6 @@ classifiers = [
 ]
 dynamic = ["version"]
 dependencies = [
-    "cachetools",
     "fastapi",
     "httpx",
     "pydantic>=2,<3",
@@ -82,10 +81,10 @@ dependency-groups = ["test"]
 env-vars.PYTHONWARNDEFAULTENCODING = "1"
 
 
-[tool.pytest]
+[tool.pytest.ini_options]
 minversion = "9.0"
 addopts = ["-ra", "--showlocals"]
-strict = true
+asyncio_mode = "auto"
 filterwarnings = [
   "error",
 ]
@@ -119,7 +118,6 @@ disallow_incomplete_defs = true
 
 [[tool.mypy.overrides]]
 module = [
-  "cryptography",
   "cryptography.*",
   "fastapi",
   "fastapi.*",
@@ -128,7 +126,6 @@ module = [
   "jose.*",
   "pydantic",
   "respx",
-  "starlette",
   "starlette.*",
 ]
 ignore_missing_imports = true
@@ -136,6 +133,7 @@ ignore_missing_imports = true
 
 [tool.ruff]
 show-fixes = true
+extend-exclude = ["src/bluesky_authentication/_version.py"]
 
 [tool.ruff.lint]
 extend-select = [
