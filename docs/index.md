@@ -7,6 +7,7 @@
 usage
 authenticator-reference
 authentication-flows
+integration-migration
 ```
 
 ```{include} ../README.md

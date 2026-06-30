@@ -16,9 +16,16 @@ from .authenticators import (
     ProxiedOIDCAuthenticator,
     SAMLAuthenticator,
 )
+from .integration import (
+    AuthProviderRegistration,
+    AuthRouteAdapter,
+    build_authentication_router,
+)
 from .protocols import ExternalAuthenticator, InternalAuthenticator, UserSessionState
 
 __all__ = [
+    "AuthProviderRegistration",
+    "AuthRouteAdapter",
     "DictionaryAuthenticator",
     "DummyAuthenticator",
     "EntraAuthenticator",
@@ -31,4 +38,5 @@ __all__ = [
     "SAMLAuthenticator",
     "UserSessionState",
     "__version__",
+    "build_authentication_router",
 ]
