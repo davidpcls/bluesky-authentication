@@ -113,17 +113,17 @@ def test_create_refresh_token_uses_hs256_algorithm() -> None:
 
 
 # ---------------------------------------------------------------------------
-# decode_token (async)
+# decode_token
 # ---------------------------------------------------------------------------
 
 
-async def test_decode_token_uses_proxied_decoder() -> None:
+def test_decode_token_uses_proxied_decoder() -> None:
     """When local keys fail, the proxied decoder is called and its result returned."""
 
-    async def proxied(token: str) -> dict[str, Any]:
+    def proxied(token: str) -> dict[str, Any]:
         return {"token": token, "sub": "proxied"}
 
-    payload = await decode_token(
+    payload = decode_token(
         "not-a-token",
         ["wrong-key"],
         proxied_decoder=proxied,
@@ -131,23 +131,23 @@ async def test_decode_token_uses_proxied_decoder() -> None:
     assert payload["sub"] == "proxied"
 
 
-async def test_decode_token_raises_credentials_exception() -> None:
+def test_decode_token_raises_credentials_exception() -> None:
     """When all decoders fail and a custom exception is supplied, it is raised."""
     exc = HTTPException(status_code=401, detail="bad credentials")
     with pytest.raises(HTTPException) as raised:
-        await decode_token("not-a-token", ["wrong-key"], credentials_exception=exc)
+        decode_token("not-a-token", ["wrong-key"], credentials_exception=exc)
     assert raised.value.detail == "bad credentials"
 
 
-async def test_decode_token_default_401_when_no_credentials_exception() -> None:
+def test_decode_token_default_401_when_no_credentials_exception() -> None:
     """When all decoders fail and no exception is supplied, a default 401 is raised."""
     with pytest.raises(HTTPException) as raised:
-        await decode_token("not-a-token", ["wrong-key"])
+        decode_token("not-a-token", ["wrong-key"])
     assert raised.value.status_code == 401
     assert "WWW-Authenticate" in (raised.value.headers or {})
 
 
-async def test_decode_token_returns_early_on_first_matching_key() -> None:
+def test_decode_token_returns_early_on_first_matching_key() -> None:
     """decode_token returns immediately after the first successful key match."""
     token = create_access_token(
         {"sub": "carol"},
@@ -158,11 +158,11 @@ async def test_decode_token_returns_early_on_first_matching_key() -> None:
 
     proxied_called: list[bool] = []
 
-    async def proxied(_t: str) -> dict[str, Any]:
+    def proxied(_t: str) -> dict[str, Any]:
         proxied_called.append(True)
         return {"sub": "should-not-be-reached"}
 
-    payload = await decode_token(token, ["key-1", "key-2"], proxied_decoder=proxied)
+    payload = decode_token(token, ["key-1", "key-2"], proxied_decoder=proxied)
     assert payload["sub"] == "carol"
     # proxied decoder must NOT have been invoked since key-1 succeeded
     assert not proxied_called

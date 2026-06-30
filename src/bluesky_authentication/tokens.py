@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from jose import ExpiredSignatureError, JWTError, jwt
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable, Sequence
+    from collections.abc import Callable, Sequence
     from datetime import timedelta
 
 ALGORITHM = "HS256"
@@ -63,18 +63,18 @@ def _try_decode_with_secret_key(token: str, secret_key: str) -> dict[str, Any] |
         return None
 
 
-async def decode_token(
+def decode_token(
     token: str,
     secret_keys: Sequence[str],
     *,
-    proxied_decoder: Callable[[str], Awaitable[dict[str, Any]]] | None = None,
+    proxied_decoder: Callable[[str], dict[str, Any]] | None = None,
     credentials_exception: HTTPException | None = None,
 ) -> dict[str, Any]:
     payload = decode_token_with_secret_keys(token, secret_keys)
     if payload is not None:
         return payload
     if proxied_decoder is not None:
-        return await proxied_decoder(token)
+        return proxied_decoder(token)
     if credentials_exception is None:
         credentials_exception = HTTPException(
             status_code=401,
