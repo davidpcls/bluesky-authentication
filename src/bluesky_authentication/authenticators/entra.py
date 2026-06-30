@@ -54,10 +54,10 @@ class EntraAuthenticator(ProxiedOIDCAuthenticator):
         # Scope mapping is configured through `scopes_map`.
         return None
 
-    async def decode_token(
+    def decode_token(
         self, id_token: str, access_token: str | None = None
     ) -> dict[str, Any]:
-        claims = await super().decode_token(id_token, access_token)
+        claims = super().decode_token(id_token, access_token)
         original_sub = claims.get("sub")
         issuer = claims.get("iss", "")
         claims["sub"] = uuid.uuid5(uuid.NAMESPACE_URL, f"{issuer}|{original_sub}").hex
@@ -126,7 +126,7 @@ class EntraAuthenticator(ProxiedOIDCAuthenticator):
         access_token = response_body.get("access_token")
         refresh_token = response_body.get("refresh_token")
         try:
-            verified_body = await self.decode_token(id_token, access_token)
+            verified_body = self.decode_token(id_token, access_token)
         except JWTError:
             logger.exception(
                 "Authentication error. Unverified token: %r",

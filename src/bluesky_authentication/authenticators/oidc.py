@@ -1,11 +1,11 @@
 import base64
 import functools
 import logging
-import time
 from datetime import timedelta
 from typing import Any, cast
 
 import httpx
+from cachetools import TTLCache, cached
 from fastapi import Request
 from fastapi.security import OAuth2, OAuth2AuthorizationCodeBearer
 from jose import JWTError, jwt
@@ -58,20 +58,15 @@ properties:
         self.confirmation_message = confirmation_message
         self.redirect_on_success = redirect_on_success
         self.redirect_on_failure = redirect_on_failure
-        self._keys_cache: list[dict[str, Any]] | None = None
-        self._keys_cache_expires_at = 0.0
 
     @functools.cached_property
     def _config_from_oidc_url(self) -> dict[str, Any]:
         """Fetch OIDC discovery document from the well-known URI.
 
         .. note::
-            This makes a **blocking** HTTP request on first access.  Subsequent
+            This makes a **blocking** HTTP request on first access. Subsequent
             accesses return the cached result without any network I/O.
-
-        # TODO: consider making this async
         """
-        # TODO: consider making this async
         response: httpx.Response = httpx.get(self._well_known_url)
         response.raise_for_status()
         return cast("dict[str, Any]", response.json())
@@ -115,31 +110,21 @@ properties:
     def end_session_endpoint(self) -> str:
         return cast("str", self._config_from_oidc_url.get("end_session_endpoint"))
 
-    async def keys(self) -> list[dict[str, Any]]:
-        if (
-            self._keys_cache is not None
-            and time.monotonic() < self._keys_cache_expires_at
-        ):
-            return self._keys_cache
-
-        async with httpx.AsyncClient() as client:
-            response = await client.get(self.jwks_uri)
-        response.raise_for_status()
-        keys = cast("list[dict[str, Any]]", response.json().get("keys", []))
-        self._keys_cache = keys
-        self._keys_cache_expires_at = (
-            time.monotonic() + timedelta(hours=1).total_seconds()
+    @cached(TTLCache(maxsize=1, ttl=timedelta(hours=1).total_seconds()))  # type: ignore[untyped-decorator]
+    def keys(self) -> list[dict[str, Any]]:
+        return cast(
+            "list[dict[str, Any]]",
+            httpx.get(self.jwks_uri).raise_for_status().json().get("keys", []),
         )
-        return keys
 
-    async def decode_token(
+    def decode_token(
         self, id_token: str, access_token: str | None = None
     ) -> dict[str, Any]:
         return cast(
             "dict[str, Any]",
             jwt.decode(
                 id_token,
-                key=await self.keys(),
+                key=self.keys(),
                 algorithms=self.id_token_signing_alg_values_supported,
                 audience=self._audience,
                 issuer=self.issuer,
@@ -155,7 +140,7 @@ properties:
             )
             return None
         redirect_uri = f"{get_root_url(request)}{request.url.path}"
-        response = await exchange_code(
+        response = exchange_code(
             self.token_endpoint,
             code,
             self._client_id,
@@ -170,7 +155,7 @@ properties:
         id_token = response_body["id_token"]
         access_token = response_body.get("access_token")
         try:
-            verified_body = await self.decode_token(id_token, access_token)
+            verified_body = self.decode_token(id_token, access_token)
         except JWTError:
             logger.exception(
                 "Authentication error. Unverified token: %r",
@@ -250,7 +235,7 @@ properties:
         return self._oidc_bearer
 
 
-async def exchange_code(
+def exchange_code(
     token_uri: str,
     auth_code: str,
     client_id: str,
@@ -262,16 +247,15 @@ async def exchange_code(
     if extra_scopes:
         scopes.update(extra_scopes)
     auth_value = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
-    async with httpx.AsyncClient() as client:
-        return await client.post(
-            url=token_uri,
-            data={
-                "grant_type": "authorization_code",
-                "client_id": client_id,
-                "redirect_uri": redirect_uri,
-                "code": auth_code,
-                "client_secret": client_secret,
-                "scope": " ".join(sorted(scopes)),
-            },
-            headers={"Authorization": f"Basic {auth_value}"},
-        )
+    return httpx.post(
+        url=token_uri,
+        data={
+            "grant_type": "authorization_code",
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "code": auth_code,
+            "client_secret": client_secret,
+            "scope": " ".join(sorted(scopes)),
+        },
+        headers={"Authorization": f"Basic {auth_value}"},
+    )

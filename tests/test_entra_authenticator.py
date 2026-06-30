@@ -6,26 +6,11 @@ import pytest
 from bluesky_authentication.authenticators import EntraAuthenticator, OIDCAuthenticator
 
 
-def _make_entra(scopes_map: dict[str, list[str]] | None = None) -> EntraAuthenticator:
-    """Build an EntraAuthenticator without touching the network."""
-    authenticator: EntraAuthenticator = object.__new__(EntraAuthenticator)
-    authenticator.scopes_map = scopes_map if scopes_map is not None else {}
-    return authenticator
-
-
-# ---------------------------------------------------------------------------
-# decode_token — scope mapping and username extraction
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio  # type: ignore[untyped-decorator]
-async def test_entra_decoding_ignores_unmapped_scopes(
+def test_entra_decoding_ignores_unmapped_scopes(
     caplog: pytest.LogCaptureFixture,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Unknown Entra scopes produce a warning; only mapped scopes are returned."""
-
-    async def _mock_decode(
+    def mock_decode_token(
         _self: Any, _id_token: str, _access_token: str | None = None
     ) -> dict[str, Any]:
         return {
@@ -35,90 +20,87 @@ async def test_entra_decoding_ignores_unmapped_scopes(
             "scp": "known.scope unknown.scope",
         }
 
-    monkeypatch.setattr(OIDCAuthenticator, "decode_token", _mock_decode)
+    monkeypatch.setattr(OIDCAuthenticator, "decode_token", mock_decode_token)
     caplog.set_level(logging.WARNING)
 
-    authenticator = _make_entra({"known.scope": ["read:metadata"]})
-    claims = await authenticator.decode_token("id-token", "access-token")
+    authenticator = object.__new__(EntraAuthenticator)
+    authenticator.scopes_map = {"known.scope": ["read:metadata"]}
+    claims = authenticator.decode_token("id-token", "access-token")
 
     assert claims["entra_sub"] == "opaque-sub"
     assert claims["entra_username"] == "alice@example.org"
     assert claims["user"] == "alice"
     assert claims["scope"] == "read:metadata"
     assert any(
-        "Unmapped Entra scope in 'scp': unknown.scope" in r.message
-        for r in caplog.records
+        "Unmapped Entra scope in 'scp': unknown.scope" in record.message
+        for record in caplog.records
     )
 
 
-@pytest.mark.asyncio  # type: ignore[untyped-decorator]
-async def test_entra_decoding_empty_scp_grants_all_mapped_scopes(
+def test_entra_decoding_empty_scp_grants_all_mapped_scopes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """When ``scp`` is absent/empty, all scopes_map values are granted (fallback)."""
+    """When scp claim is absent, all mapped scopes are granted."""
 
-    async def _mock_decode(
+    def mock_decode_token(
         _self: Any, _id_token: str, _access_token: str | None = None
     ) -> dict[str, Any]:
         return {
-            "iss": "https://login.microsoftonline.com/tenant/v2.0",
-            "sub": "sub-xyz",
+            "iss": "https://login.microsoftonline.com/example-tenant/v2.0",
+            "sub": "opaque-sub",
             "preferred_username": "bob@example.org",
-            "scp": "",  # empty string — triggers the fallback branch
+            # no "scp" key
         }
 
-    monkeypatch.setattr(OIDCAuthenticator, "decode_token", _mock_decode)
+    monkeypatch.setattr(OIDCAuthenticator, "decode_token", mock_decode_token)
 
-    authenticator = _make_entra({"scope.a": ["read:data"], "scope.b": ["write:data"]})
-    claims = await authenticator.decode_token("id-token", "access-token")
+    authenticator = object.__new__(EntraAuthenticator)
+    authenticator.scopes_map = {
+        "scope.a": ["read:metadata"],
+        "scope.b": ["write:data"],
+    }
+    claims = authenticator.decode_token("id-token", "access-token")
 
-    granted = set(claims["scope"].split())
-    assert granted == {"read:data", "write:data"}
+    assert set(claims["scope"].split()) == {"read:metadata", "write:data"}
 
 
-@pytest.mark.asyncio  # type: ignore[untyped-decorator]
-async def test_entra_decoding_upn_style_username_trimmed(
+def test_entra_decoding_upn_style_username_trimmed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """UPN-style username ``DOMAIN\\user`` is trimmed to ``user``."""
+    """domain\\user UPN format is trimmed to just the user part."""
 
-    async def _mock_decode(
+    def mock_decode_token(
         _self: Any, _id_token: str, _access_token: str | None = None
     ) -> dict[str, Any]:
         return {
-            "iss": "https://login.microsoftonline.com/tenant/v2.0",
-            "sub": "sub-abc",
-            "preferred_username": "DOMAIN\\carol",
+            "iss": "https://login.microsoftonline.com/example-tenant/v2.0",
+            "sub": "opaque-sub",
+            "preferred_username": "DOMAIN\\charlie",
             "scp": "",
         }
 
-    monkeypatch.setattr(OIDCAuthenticator, "decode_token", _mock_decode)
+    monkeypatch.setattr(OIDCAuthenticator, "decode_token", mock_decode_token)
 
-    authenticator = _make_entra({})
-    claims = await authenticator.decode_token("id-token", "access-token")
+    authenticator = object.__new__(EntraAuthenticator)
+    authenticator.scopes_map = {}
+    claims = authenticator.decode_token("id-token", "access-token")
 
-    assert claims["user"] == "carol"
-
-
-# ---------------------------------------------------------------------------
-# scopes property / setter
-# ---------------------------------------------------------------------------
+    assert claims["user"] == "charlie"
 
 
 def test_entra_scopes_property_returns_union_of_all_map_values() -> None:
-    """``scopes`` is the union of all lists in scopes_map."""
-    authenticator = _make_entra(
-        {
-            "scope.read": ["read:data", "read:meta"],
-            "scope.write": ["write:data", "read:data"],  # overlap intentional
-        }
-    )
-    assert set(authenticator.scopes) == {"read:data", "read:meta", "write:data"}
+    """scopes property returns the union of all values in scopes_map."""
+    authenticator = object.__new__(EntraAuthenticator)
+    authenticator.scopes_map = {
+        "scope.a": ["read:metadata", "read:data"],
+        "scope.b": ["write:data"],
+    }
+    assert set(authenticator.scopes) == {"read:metadata", "read:data", "write:data"}
 
 
 def test_entra_scopes_setter_is_a_noop() -> None:
-    """The scopes setter does not mutate scopes_map or raise."""
-    authenticator = _make_entra({"scope.read": ["read:data"]})
-    before = set(authenticator.scopes)
-    authenticator.scopes = ["injected:scope"]
-    assert set(authenticator.scopes) == before
+    """Setting scopes has no effect — scopes_map is the source of truth."""
+    authenticator = object.__new__(EntraAuthenticator)
+    authenticator.scopes_map = {"scope.a": ["read:metadata"]}
+    authenticator.scopes = ["something-else"]  # setter is a no-op by design
+    assert set(authenticator.scopes) == {"read:metadata"}
