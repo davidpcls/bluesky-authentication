@@ -80,12 +80,13 @@ def test_oidc_authenticator_caching(
     for _ in range(10):
         assert authenticator.keys() == json_web_keyset
 
+    # TTLCache: JWKS fetched once, cached for subsequent calls
     assert len(mock_oidc_server.calls) == 2
 
 
-@pytest.mark.parametrize("issued", [True, False])
-@pytest.mark.parametrize("expired", [True, False])
-@pytest.mark.usefixtures("mock_oidc_server")
+@pytest.mark.parametrize("issued", [True, False])  # type: ignore[untyped-decorator]
+@pytest.mark.parametrize("expired", [True, False])  # type: ignore[untyped-decorator]
+@pytest.mark.usefixtures("mock_oidc_server")  # type: ignore[untyped-decorator]
 def test_oidc_decoding(
     well_known_url: str,
     issued: bool,
@@ -126,7 +127,7 @@ def create_mock_oidc_request(query_params: dict[str, str] | None = None):
     return MockRequest(query_params)
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio  # type: ignore[untyped-decorator]
 async def test_oidc_authenticator_mock(
     mock_oidc_server: MockRouter,
     well_known_url: str,
@@ -180,7 +181,81 @@ async def test_oidc_authenticator_mock(
     assert user_session.user_name == "0009-0008-8698-7745"
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio  # type: ignore[untyped-decorator]
+async def test_oidc_preferred_username_without_at_used_as_is(
+    mock_oidc_server: MockRouter,
+    well_known_url: str,
+    well_known_response: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """preferred_username without @ is used verbatim as user_name."""
+    mock_oidc_server.post(well_known_response["token_endpoint"]).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "access_token": "mock-access-token",
+                "id_token": "mock-id-token",
+                "token_type": "bearer",
+            },
+        )
+    )
+    authenticator = OIDCAuthenticator(
+        audience="APP-TEST-CLIENT-ID",
+        client_id="APP-TEST-CLIENT-ID",
+        client_secret="test-secret",
+        well_known_uri=well_known_url,
+    )
+    mock_request = create_mock_oidc_request({"code": "test-auth-code"})
+    monkeypatch.setattr(
+        "jose.jwt.decode",
+        lambda *_a, **_kw: {
+            "sub": "some-sub",
+            "aud": "APP-TEST-CLIENT-ID",
+            "preferred_username": "alice",
+        },
+    )
+    monkeypatch.setattr("jose.jwk.construct", lambda *_a, **_kw: object())
+    result = await authenticator.authenticate(mock_request)
+    assert result is not None
+    assert result.user_name == "alice"
+
+
+@pytest.mark.asyncio  # type: ignore[untyped-decorator]
+async def test_oidc_falls_back_to_sub_when_no_preferred_username(
+    mock_oidc_server: MockRouter,
+    well_known_url: str,
+    well_known_response: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When preferred_username is absent, sub is used as user_name."""
+    mock_oidc_server.post(well_known_response["token_endpoint"]).mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "access_token": "mock-access-token",
+                "id_token": "mock-id-token",
+                "token_type": "bearer",
+            },
+        )
+    )
+    authenticator = OIDCAuthenticator(
+        audience="APP-TEST-CLIENT-ID",
+        client_id="APP-TEST-CLIENT-ID",
+        client_secret="test-secret",
+        well_known_uri=well_known_url,
+    )
+    mock_request = create_mock_oidc_request({"code": "test-auth-code"})
+    monkeypatch.setattr(
+        "jose.jwt.decode",
+        lambda *_a, **_kw: {"sub": "opaque-sub-id", "aud": "APP-TEST-CLIENT-ID"},
+    )
+    monkeypatch.setattr("jose.jwk.construct", lambda *_a, **_kw: object())
+    result = await authenticator.authenticate(mock_request)
+    assert result is not None
+    assert result.user_name == "opaque-sub-id"
+
+
+@pytest.mark.asyncio  # type: ignore[untyped-decorator]
 async def test_oidc_authenticator_missing_code_parameter(well_known_url: str) -> None:
     authenticator = OIDCAuthenticator(
         audience="APP-TEST-CLIENT-ID",
@@ -195,7 +270,7 @@ async def test_oidc_authenticator_missing_code_parameter(well_known_url: str) ->
     assert result is None
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio  # type: ignore[untyped-decorator]
 async def test_oidc_authenticator_token_exchange_failure(
     well_known_url: str,
     mock_oidc_server: MockRouter,

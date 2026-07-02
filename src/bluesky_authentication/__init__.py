@@ -16,9 +16,28 @@ from .authenticators import (
     ProxiedOIDCAuthenticator,
     SAMLAuthenticator,
 )
+from .integration import (
+    AuthProviderRegistration,
+    AuthRouteAdapter,
+    build_authentication_router,
+)
 from .protocols import ExternalAuthenticator, InternalAuthenticator, UserSessionState
+from .tokens import (
+    ALGORITHM,
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    decode_token_with_secret_keys,
+)
+from .utils import (
+    extract_scopes,
+    find_proxied_authenticator,
+)
 
 __all__ = [
+    "ALGORITHM",
+    "AuthProviderRegistration",
+    "AuthRouteAdapter",
     "DictionaryAuthenticator",
     "DummyAuthenticator",
     "EntraAuthenticator",
@@ -31,4 +50,11 @@ __all__ = [
     "SAMLAuthenticator",
     "UserSessionState",
     "__version__",
+    "build_authentication_router",
+    "create_access_token",
+    "create_refresh_token",
+    "decode_token",
+    "decode_token_with_secret_keys",
+    "extract_scopes",
+    "find_proxied_authenticator",
 ]

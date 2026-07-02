@@ -134,3 +134,32 @@ authentication:
 Host services may retain backward-compatible aliases (for example
 `tiled.authenticators:*` or `bluesky_httpserver.authenticators:*`), but new
 configuration should use `bluesky_authentication.authenticators:*`.
+
+## Shared route wiring
+
+`bluesky-authentication` includes a shared route factory that host applications
+can use to avoid duplicating provider route registration.
+
+```python
+from bluesky_authentication.integration import (
+    AuthProviderRegistration,
+    AuthRouteAdapter,
+    build_authentication_router,
+)
+
+
+class MyAdapter(AuthRouteAdapter):
+    ...
+
+
+providers = [
+    AuthProviderRegistration("local", local_authenticator),
+    AuthProviderRegistration("oidc", oidc_authenticator),
+]
+
+router = build_authentication_router(providers, MyAdapter())
+app.include_router(router, prefix="/api/auth")
+```
+
+The adapter defines host-specific handlers and settings integration, while
+`build_authentication_router()` defines the shared route topology.

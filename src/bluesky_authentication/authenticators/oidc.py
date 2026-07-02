@@ -1,11 +1,11 @@
 import base64
 import functools
 import logging
-import time
 from datetime import timedelta
 from typing import Any, cast
 
 import httpx
+from cachetools import TTLCache, cached
 from fastapi import Request
 from fastapi.security import OAuth2, OAuth2AuthorizationCodeBearer
 from jose import JWTError, jwt
@@ -21,7 +21,7 @@ class OIDCAuthenticator(ExternalAuthenticator):
     """Authenticate users using an OpenID Connect authorization code flow."""
 
     configuration_schema = """
-$schema": http://json-schema.org/draft-07/schema#
+"$schema": http://json-schema.org/draft-07/schema#
 type: object
 additionalProperties: false
 properties:
@@ -58,11 +58,15 @@ properties:
         self.confirmation_message = confirmation_message
         self.redirect_on_success = redirect_on_success
         self.redirect_on_failure = redirect_on_failure
-        self._keys_cache: list[dict[str, Any]] | None = None
-        self._keys_cache_expires_at = 0.0
 
     @functools.cached_property
     def _config_from_oidc_url(self) -> dict[str, Any]:
+        """Fetch OIDC discovery document from the well-known URI.
+
+        .. note::
+            This makes a **blocking** HTTP request on first access. Subsequent
+            accesses return the cached result without any network I/O.
+        """
         response: httpx.Response = httpx.get(self._well_known_url)
         response.raise_for_status()
         return cast("dict[str, Any]", response.json())
@@ -106,21 +110,12 @@ properties:
     def end_session_endpoint(self) -> str:
         return cast("str", self._config_from_oidc_url.get("end_session_endpoint"))
 
+    @cached(TTLCache(maxsize=1, ttl=timedelta(hours=1).total_seconds()))  # type: ignore[untyped-decorator]
     def keys(self) -> list[dict[str, Any]]:
-        if (
-            self._keys_cache is not None
-            and time.monotonic() < self._keys_cache_expires_at
-        ):
-            return self._keys_cache
-
-        response = httpx.get(self.jwks_uri)
-        response.raise_for_status()
-        keys = cast("list[dict[str, Any]]", response.json().get("keys", []))
-        self._keys_cache = keys
-        self._keys_cache_expires_at = (
-            time.monotonic() + timedelta(hours=1).total_seconds()
+        return cast(
+            "list[dict[str, Any]]",
+            httpx.get(self.jwks_uri).raise_for_status().json().get("keys", []),
         )
-        return keys
 
     def decode_token(
         self, id_token: str, access_token: str | None = None
@@ -145,7 +140,7 @@ properties:
             )
             return None
         redirect_uri = f"{get_root_url(request)}{request.url.path}"
-        response = await exchange_code(
+        response = exchange_code(
             self.token_endpoint,
             code,
             self._client_id,
@@ -189,7 +184,7 @@ class ProxiedOIDCAuthenticator(OIDCAuthenticator):
     """Expose OIDC bearer-token schema for authentication handled upstream."""
 
     configuration_schema = """
-$schema": http://json-schema.org/draft-07/schema#
+"$schema": http://json-schema.org/draft-07/schema#
 type: object
 additionalProperties: false
 properties:
@@ -240,7 +235,7 @@ properties:
         return self._oidc_bearer
 
 
-async def exchange_code(
+def exchange_code(
     token_uri: str,
     auth_code: str,
     client_id: str,

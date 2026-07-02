@@ -19,13 +19,11 @@ class InternalAuthenticator(ABC):
     @abstractmethod
     async def authenticate(
         self, username: str, password: str
-    ) -> UserSessionState | None:
-        raise NotImplementedError
+    ) -> UserSessionState | None: ...
 
 
 class ExternalAuthenticator(ABC):
     """Base class for authenticators that use external identity providers."""
 
     @abstractmethod
-    async def authenticate(self, request: Request) -> UserSessionState | None:
-        raise NotImplementedError
+    async def authenticate(self, request: Request) -> UserSessionState | None: ...

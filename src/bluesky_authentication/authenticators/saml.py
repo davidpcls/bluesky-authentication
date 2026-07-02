@@ -67,13 +67,16 @@ class SAMLAuthenticator(ExternalAuthenticator):
             raise SAMLResponseError(msg)
         if auth.is_authenticated():
             attribute_as_list = auth.get_attributes()[self.attribute_name]
-            assert len(attribute_as_list) == 1
+            if len(attribute_as_list) != 1:
+                msg = f"Expected exactly one value for attribute {self.attribute_name!r}, got {len(attribute_as_list)}"
+                raise SAMLResponseError(msg)
             return UserSessionState(attribute_as_list[0], {})
         return None
 
 
 async def prepare_saml_from_fastapi_request(request: Request) -> Mapping[str, Any]:
     form_data = await request.form()
+    # request.client may be None when the server is behind a proxy or in tests.
     client_host = request.client.host if request.client is not None else ""
     rv: dict[str, Any] = {
         "http_host": client_host,
