@@ -29,6 +29,10 @@ from .tokens import (
     decode_token,
     decode_token_with_secret_keys,
 )
+from .utils import (
+    extract_scopes,
+    find_proxied_authenticator,
+)
 
 __all__ = [
     "ALGORITHM",
@@ -51,4 +55,6 @@ __all__ = [
     "create_refresh_token",
     "decode_token",
     "decode_token_with_secret_keys",
+    "extract_scopes",
+    "find_proxied_authenticator",
 ]
